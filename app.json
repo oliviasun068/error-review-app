@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "错题策展人",
+    "slug": "error-review-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.errorreview.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "需要访问相册以添加错题图片",
+        "NSCameraUsageDescription": "需要相机权限以拍摄题目照片",
+        "NSUserNotificationsUsageDescription": "需要通知权限以发送复习提醒"
+      }
+    },
+    "android": {
+      "package": "com.errorreview.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0EA5E9",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-image-picker",
+      "expo-notifications"
+    ],
+    "extra": {
+      "aiApiUrl": ""
+    }
+  }
+}
