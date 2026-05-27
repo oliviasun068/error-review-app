@@ -238,6 +238,14 @@ export default function ReviewScreen() {
             {currentError?.correctSolution || '（未录入正确答案）'}
           </Text>
 
+          {currentError?.correctSolutionImagePath && (
+            <Image
+              source={{ uri: currentError.correctSolutionImagePath }}
+              style={styles.solutionImage}
+              resizeMode="contain"
+            />
+          )}
+
           {currentError?.errorAnalysis && (
             <>
               <View style={styles.divider} />
@@ -392,6 +400,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.text,
     lineHeight: 22,
+  },
+  solutionImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.bgSecondary,
   },
   divider: {
     height: 1,

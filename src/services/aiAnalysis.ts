@@ -5,7 +5,7 @@
  */
 
 import Constants from 'expo-constants'
-import * as FileSystem from 'expo-file-system'
+import { File } from 'expo-file-system'
 
 export interface AnalysisResult {
   questionText: string
@@ -22,6 +22,7 @@ type AnalyzePayload = {
   questionText?: string
   imageBase64?: string
   imageMimeType?: string
+  textbookVersion?: string
 }
 
 function getAiApiUrl(): string {
@@ -196,26 +197,25 @@ export function analyzeProblemText(text: string): AnalysisResult {
 /**
  * 用 AI 分析文本题目；未配置接口时退回本地规则分析
  */
-export async function analyzeProblemTextWithAI(text: string): Promise<AnalysisResult> {
+export async function analyzeProblemTextWithAI(text: string, textbookVersion?: string): Promise<AnalysisResult> {
   const apiUrl = getAiApiUrl()
   if (!apiUrl) {
     return analyzeProblemText(text)
   }
 
-  return requestAiAnalysis({ questionText: text })
+  return requestAiAnalysis({ questionText: text, textbookVersion })
 }
 
 /**
  * 分析图片中的题目
  * 先用AI多模态API，fallback到OCR+规则
  */
-export async function analyzeProblemImage(imagePath: string): Promise<AnalysisResult> {
-  const imageBase64 = await FileSystem.readAsStringAsync(imagePath, {
-    encoding: 'base64',
-  })
+export async function analyzeProblemImage(imagePath: string, textbookVersion?: string): Promise<AnalysisResult> {
+  const imageBase64 = await new File(imagePath).base64()
 
   return requestAiAnalysis({
     imageBase64,
     imageMimeType: inferImageMimeType(imagePath),
+    textbookVersion,
   })
 }

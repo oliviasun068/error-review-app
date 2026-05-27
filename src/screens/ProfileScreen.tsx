@@ -26,11 +26,13 @@ import {
   cancelAllScheduledNotifications,
   getNotificationPermission,
 } from '../services/notifications'
+import { TEXTBOOK_VERSIONS } from '../services/knowledgeSystem'
 
 export default function ProfileScreen() {
   const [dailyReminder, setDailyReminder] = useState(false)
   const [weekendMode, setWeekendMode] = useState(false)
   const [dailyLimit, setDailyLimit] = useState('3')
+  const [textbookVersion, setTextbookVersion] = useState('人教B版')
   const [hasPermission, setHasPermission] = useState(false)
   const [stats, setStats] = useState<StudyStats>({ totalErrors: 0, pendingReview: 0, mastered: 0, weakAreas: [], todayReviewCount: 0, streakDays: 0 })
 
@@ -42,12 +44,14 @@ export default function ProfileScreen() {
     const reminder = await getSetting('daily_reminder', 'true')
     const weekend = await getSetting('weekend_mode', 'false')
     const limit = await getSetting('daily_limit', '3')
+    const textbook = await getSetting('textbook_version', '人教B版')
     const perm = await getNotificationPermission()
     const s = await getStudyStats()
 
     setDailyReminder(reminder === 'true')
     setWeekendMode(weekend === 'true')
     setDailyLimit(limit)
+    setTextbookVersion(textbook)
     setHasPermission(perm)
     setStats(s)
   }
@@ -183,6 +187,28 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
+      {/* 教材设置 */}
+      <Card style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>教材设置</Text>
+        <Text style={styles.settingDesc}>用于AI归类、章节筛选和知识点候选</Text>
+        <View style={styles.textbookGrid}>
+          {TEXTBOOK_VERSIONS.map(version => (
+            <TouchableOpacity
+              key={version}
+              style={[styles.textbookTag, textbookVersion === version && styles.textbookTagActive]}
+              onPress={async () => {
+                setTextbookVersion(version)
+                await setSetting('textbook_version', version)
+              }}
+            >
+              <Text style={[styles.textbookText, textbookVersion === version && styles.textbookTextActive]}>
+                {version}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Card>
+
       {/* 数据管理 */}
       <Card style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>数据管理</Text>
@@ -303,6 +329,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   limitTextActive: {
+    color: Colors.textInverse,
+  },
+  textbookGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  textbookTag: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.round,
+    backgroundColor: Colors.bgTertiary,
+  },
+  textbookTagActive: {
+    backgroundColor: Colors.primary,
+  },
+  textbookText: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  textbookTextActive: {
     color: Colors.textInverse,
   },
   // 菜单

@@ -39,15 +39,15 @@ app.post('/api/analyze-error', async (req, res) => {
   }
 })
 
-function buildPrompt(questionText) {
-  return `请分析下面这道高中数学错题，并只返回 JSON，不要输出 Markdown。
+function buildPrompt(questionText, textbookVersion) {
+  return `请识别并分析这道高中数学错题，并只返回 JSON，不要输出 Markdown。
 
 要求：
-1. questionText 保留完整题目文本。数学公式尽量保留原符号，必要时使用 LaTeX。
-2. module 必须从这些值里选一个：${MODULES.join('、')}。
+1. questionText 保留完整题目文本。若提供了图片，请先 OCR 识别图片中的题目；数学公式尽量保留原符号，必要时使用 LaTeX。若有函数图像、几何图、表格或选项，请把图形信息用文字描述进 questionText。
+2. 当前教材版本是：${textbookVersion || '人教B版'}。module 必须从这些值里选一个：${MODULES.join('、')}。
 3. errorTypes 只能从这些值里选：${ERROR_TYPES.join('、')}。
 4. difficulty 是 1 到 5 的整数。
-5. 不确定的字段用空字符串或空数组，不要编造。
+5. 看不清或不确定的字段用空字符串、空数组或“图片局部不清”，不要编造。
 
 返回 JSON 格式：
 {
@@ -62,7 +62,33 @@ function buildPrompt(questionText) {
 }
 
 题目文本：
-${questionText}`
+${questionText || '请从图片中识别题目。'}`
+}
+
+function imageDataUrl(payload) {
+  if (!payload.imageBase64) return null
+  const mimeType = payload.imageMimeType || 'image/jpeg'
+  return `data:${mimeType};base64,${payload.imageBase64}`
+}
+
+function buildUserContent(payload) {
+  const dataUrl = imageDataUrl(payload)
+  if (!dataUrl) {
+    return buildPrompt(payload.questionText, payload.textbookVersion)
+  }
+
+  return [
+    {
+      type: 'text',
+      text: buildPrompt(payload.questionText, payload.textbookVersion),
+    },
+    {
+      type: 'image_url',
+      image_url: {
+        url: dataUrl,
+      },
+    },
+  ]
 }
 
 function parseJsonContent(content) {
@@ -81,11 +107,8 @@ async function analyzeProblem(payload) {
     throw new Error('服务端缺少 DEEPSEEK_API_KEY')
   }
 
-  if (!payload?.questionText?.trim()) {
-    if (payload?.imageBase64) {
-      throw new Error('DeepSeek 官方 API 当前按文本接口接入，请先 OCR 出题目文字，或改用支持图片输入的视觉模型。')
-    }
-    throw new Error('请提供 questionText')
+  if (!payload?.questionText?.trim() && !payload?.imageBase64) {
+    throw new Error('请提供 questionText 或 imageBase64')
   }
 
   const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -103,7 +126,7 @@ async function analyzeProblem(payload) {
         },
         {
           role: 'user',
-          content: buildPrompt(payload.questionText),
+          content: buildUserContent(payload),
         },
       ],
       response_format: { type: 'json_object' },

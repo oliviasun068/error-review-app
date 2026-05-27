@@ -23,6 +23,7 @@ export interface ErrorProblem {
   errorTypes: string  // JSON array
   errorAnalysis: string
   correctSolution: string
+  correctSolutionImagePath: string | null
   createdAt: string
   reviewStatus: '待复习' | '已复习' | '已掌握'
   nextReviewAt: string | null
@@ -93,6 +94,7 @@ export async function initDatabase(): Promise<void> {
       errorTypes TEXT DEFAULT '[]',
       errorAnalysis TEXT DEFAULT '',
       correctSolution TEXT DEFAULT '',
+      correctSolutionImagePath TEXT,
       createdAt TEXT NOT NULL,
       reviewStatus TEXT DEFAULT '待复习',
       nextReviewAt TEXT,
@@ -100,6 +102,8 @@ export async function initDatabase(): Promise<void> {
       mastery TEXT DEFAULT '未评估'
     )
   `)
+
+  await ensureColumn('error_problems', 'correctSolutionImagePath', 'TEXT')
 
   // 创建复习记录表
   await db.execAsync(`
@@ -161,8 +165,8 @@ export async function addErrorProblem(problem: Omit<ErrorProblem, 'id' | 'errorI
 
   await getDb().runAsync(
     `INSERT INTO error_problems (errorId, imagePath, questionText, module, chapter, knowledgePoints,
-      difficulty, errorTypes, errorAnalysis, correctSolution, createdAt, reviewStatus, nextReviewAt, reviewCount, mastery)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '待复习', ?, 0, '未评估')`,
+      difficulty, errorTypes, errorAnalysis, correctSolution, correctSolutionImagePath, createdAt, reviewStatus, nextReviewAt, reviewCount, mastery)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '待复习', ?, 0, '未评估')`,
     [
       errorId,
       problem.imagePath ?? null,
@@ -174,12 +178,20 @@ export async function addErrorProblem(problem: Omit<ErrorProblem, 'id' | 'errorI
       problem.errorTypes ?? '[]',
       problem.errorAnalysis ?? '',
       problem.correctSolution ?? '',
+      problem.correctSolutionImagePath ?? null,
       now,
       nextReview,
     ]
   )
 
   return errorId
+}
+
+async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  const columns = await getDb().getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`)
+  if (!columns.some(item => item.name === column)) {
+    await getDb().execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+  }
 }
 
 export async function getAllErrors(): Promise<ErrorProblem[]> {

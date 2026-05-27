@@ -33,18 +33,21 @@ type Nav = BottomTabNavigationProp<TabParamList>
 import { Card } from '../components/Card'
 import {
   addErrorProblem,
-  MODULES,
   ERROR_TYPES,
   DIFFICULTY_LABELS,
+  getSetting,
 } from '../services/database'
 import { analyzeProblemImage, analyzeProblemTextWithAI, AnalysisResult } from '../services/aiAnalysis'
+import { getAllKnowledgePoints, getChapters, getModules } from '../services/knowledgeSystem'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function AddErrorScreen() {
   const navigation = useNavigation<Nav>()
 
   const [imageUri, setImageUri] = useState<string | null>(null)
+  const [solutionImageUri, setSolutionImageUri] = useState<string | null>(null)
   const [questionText, setQuestionText] = useState('')
+  const [textbookVersion, setTextbookVersion] = useState('人教B版')
   const [module, setModule] = useState('')
   const [chapter, setChapter] = useState('')
   const [difficulty, setDifficulty] = useState(1)
@@ -56,6 +59,14 @@ export default function AddErrorScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [showDifficultyPicker, setShowDifficultyPicker] = useState(false)
+
+  React.useEffect(() => {
+    getSetting('textbook_version', '人教B版').then(setTextbookVersion)
+  }, [])
+
+  const moduleOptions = getModules(textbookVersion)
+  const chapterOptions = module ? getChapters(textbookVersion, module) : []
+  const knowledgePointOptions = getAllKnowledgePoints(textbookVersion, module, chapter)
 
   function applyAnalysisResult(result: AnalysisResult) {
     if (result.questionText.trim()) setQuestionText(result.questionText)
@@ -71,7 +82,7 @@ export default function AddErrorScreen() {
   async function analyzeUploadedImage(uri: string) {
     setIsAnalyzing(true)
     try {
-      const result = await analyzeProblemImage(uri)
+      const result = await analyzeProblemImage(uri, textbookVersion)
       applyAnalysisResult(result)
       Alert.alert('识别完成', 'AI 已把题目内容填入文本框，你可以继续检查和修改。')
     } catch (e: any) {
@@ -81,12 +92,11 @@ export default function AddErrorScreen() {
     }
   }
 
-  // 选择图片
-  async function pickImage() {
+  async function pickImageFromLibrary(): Promise<string | null> {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
       Alert.alert('权限提示', '需要访问相册权限')
-      return
+      return null
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -95,7 +105,16 @@ export default function AddErrorScreen() {
     })
 
     if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri
+      return result.assets[0].uri
+    }
+
+    return null
+  }
+
+  // 选择题目图片
+  async function pickImage() {
+    const uri = await pickImageFromLibrary()
+    if (uri) {
       setImageUri(uri)
       await analyzeUploadedImage(uri)
     }
@@ -119,6 +138,13 @@ export default function AddErrorScreen() {
     }
   }
 
+  async function pickSolutionImage() {
+    const uri = await pickImageFromLibrary()
+    if (uri) {
+      setSolutionImageUri(uri)
+    }
+  }
+
   // AI分析
   async function runAnalysis() {
     if (!questionText.trim() && !imageUri) {
@@ -129,8 +155,8 @@ export default function AddErrorScreen() {
     setIsAnalyzing(true)
     try {
       const result = imageUri && !questionText.trim()
-        ? await analyzeProblemImage(imageUri)
-        : await analyzeProblemTextWithAI(questionText)
+        ? await analyzeProblemImage(imageUri, textbookVersion)
+        : await analyzeProblemTextWithAI(questionText, textbookVersion)
       applyAnalysisResult(result)
       Alert.alert('分析完成', result.module ? `识别到模块：${result.module}` : 'AI分析已完成')
     } catch (e: any) {
@@ -168,6 +194,7 @@ export default function AddErrorScreen() {
         errorTypes: JSON.stringify(errorTypes),
         errorAnalysis: errorAnalysis.trim(),
         correctSolution: correctSolution.trim(),
+        correctSolutionImagePath: solutionImageUri,
       })
 
       Alert.alert('录入成功', '错题已保存到数据库', [
@@ -183,6 +210,7 @@ export default function AddErrorScreen() {
 
   function resetForm() {
     setImageUri(null)
+    setSolutionImageUri(null)
     setQuestionText('')
     setModule('')
     setChapter('')
@@ -257,7 +285,7 @@ export default function AddErrorScreen() {
       <Card style={styles.inputCard}>
         <Text style={styles.label}>所属模块</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerRow}>
-          {MODULES.map(m => (
+          {moduleOptions.map(m => (
             <TouchableOpacity
               key={m}
               style={[styles.pickerTag, module === m && styles.pickerTagActive]}
@@ -273,6 +301,50 @@ export default function AddErrorScreen() {
           ))}
         </ScrollView>
       </Card>
+
+      {module ? (
+        <Card style={styles.inputCard}>
+          <Text style={styles.label}>所属章节</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerRow}>
+            {chapterOptions.map(item => (
+              <TouchableOpacity
+                key={item.title}
+                style={[styles.pickerTag, chapter === item.title && styles.pickerTagActive]}
+                onPress={() => setChapter(item.title === chapter ? '' : item.title)}
+              >
+                <Text style={[styles.pickerTagText, chapter === item.title && styles.pickerTagTextActive]}>
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Card>
+      ) : null}
+
+      {knowledgePointOptions.length > 0 ? (
+        <Card style={styles.inputCard}>
+          <Text style={styles.label}>知识点</Text>
+          <View style={styles.typeGrid}>
+            {knowledgePointOptions.map(point => (
+              <TouchableOpacity
+                key={point}
+                style={[styles.typeTag, knowledgePoints.includes(point) && styles.typeTagActive]}
+                onPress={() => {
+                  setKnowledgePoints(prev =>
+                    prev.includes(point)
+                      ? prev.filter(item => item !== point)
+                      : [...prev, point]
+                  )
+                }}
+              >
+                <Text style={[styles.typeText, knowledgePoints.includes(point) && styles.typeTextActive]}>
+                  {knowledgePoints.includes(point) ? '✓ ' : ''}{point}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Card>
+      ) : null}
 
       {/* 难度 */}
       <Card style={styles.inputCard}>
@@ -334,6 +406,23 @@ export default function AddErrorScreen() {
           value={correctSolution}
           onChangeText={setCorrectSolution}
         />
+        {solutionImageUri && (
+          <Image
+            source={{ uri: solutionImageUri }}
+            style={styles.solutionPreviewImage}
+            resizeMode="contain"
+          />
+        )}
+        <View style={styles.imageActions}>
+          <TouchableOpacity style={styles.imageBtn} onPress={pickSolutionImage}>
+            <Text style={styles.imageBtnText}>🖼 上传解法图</Text>
+          </TouchableOpacity>
+          {solutionImageUri && (
+            <TouchableOpacity style={styles.imageBtn} onPress={() => setSolutionImageUri(null)}>
+              <Text style={[styles.imageBtnText, { color: Colors.error }]}>✕ 移除</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </Card>
 
       {/* 提交按钮 */}
@@ -374,6 +463,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: BorderRadius.md,
+  },
+  solutionPreviewImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.bgSecondary,
   },
   imagePlaceholder: {
     height: 150,
