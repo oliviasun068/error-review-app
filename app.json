@@ -39,7 +39,7 @@
       "expo-notifications"
     ],
     "extra": {
-      "aiApiUrl": ""
+      "aiApiUrl": "https://error-review-app.onrender.com/api/analyze-error"
     }
   }
 }
